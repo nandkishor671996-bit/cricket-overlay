@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Live Cricket Overlay v12.3</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Orbitron:wght@700;900&family=Rajdhani:wght@500;600;700&family=Teko:wght@500;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --gold:#FFD700;--orange:#FF6B00;--red:#E8001D;--green:#00E676;--sky:#00B0FF;--purple:#7C3AED;
+  --bg1:#05080f;--bg2:#080f1e;
+  --fc:#ffffff;
+  --bc:#0a1628;
+}
+html,body{width:1280px;height:720px;overflow:hidden;background:transparent;font-family:'Rajdhani',sans-serif;color:var(--fc);}
+.overlay{width:1280px;height:720px;display:flex;flex-direction:column;position:relative;}
+
+/* ═══ TOP BAR ═══════════════════════════════════════════════════*/
+.top-bar{height:110px;display:grid;grid-template-columns:1fr 180px 1fr;align-items:stretch;border-bottom:3px solid var(--orange);flex-shrink:0;}
+
+.team-panel{background:linear-gradient(135deg,var(--bc),#040810);display:flex;align-items:center;padding:0 14px;gap:10px;position:relative;overflow:hidden;}
+.team-panel::before{content:'';position:absolute;top:0;bottom:0;width:4px;background:linear-gradient(180deg,var(--orange),var(--gold));}
+.team-panel.right{flex-direction:row-reverse;}
+.team-panel.right::before{left:auto;right:0;background:linear-gradient(180deg,var(--sky),var(--purple));}
+.team-panel.left::before{left:0;}
+
+.t-score-big{font-family:'Bebas Neue',sans-serif;font-size:82px;line-height:.9;color:var(--fc);flex-shrink:0;}
+.t-score-big.flash{animation:sflash .5s ease;}
+@keyframes sflash{40%{color:var(--gold);text-shadow:0 0 28px var(--gold);}}
+
+.t-info-col{display:flex;flex-direction:column;justify-content:center;}
+.t-info-col.right{align-items:flex-end;}
+.t-name{font-family:'Orbitron',sans-serif;font-size:13px;font-weight:900;color:var(--gold);letter-spacing:2px;text-transform:uppercase;}
+.t-overs{font-size:22px;font-weight:700;color:rgba(255,255,255,.6);font-family:'Teko',sans-serif;letter-spacing:1px;}
+
+/* ── FLAG RING ── FIXED: image fills to edge of inner circle */
+.flag-ring{width:90px;height:90px;border-radius:50%;display:flex;align-items:center;justify-content:center;position:relative;flex-shrink:0;}
+.flag-ring::before{content:'';position:absolute;inset:-3px;border-radius:50%;background:conic-gradient(var(--gold) 0deg,var(--orange) 90deg,var(--gold) 180deg,transparent 240deg,var(--gold) 300deg,var(--orange) 360deg);animation:spinR 2.4s linear infinite;z-index:0;}
+.flag-ring::after{content:'';position:absolute;inset:2px;border-radius:50%;background:var(--bc);z-index:1;}
+@keyframes spinR{to{transform:rotate(360deg);}}
+/* flag-inner: fills the full inner area (no gap) */
+.flag-inner{
+  position:relative;z-index:2;
+  width:86px;height:86px;  /* fills to ring edge minus border */
+  border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  overflow:hidden;
+  font-size:36px;
+  background:#0a1428;
+}
+.flag-inner img{
+  width:100%;height:100%;
+  object-fit:cover;
+  object-position:center;
+  border-radius:50%;
+  display:block;
+}
+.flag-ring.right::before{background:conic-gradient(var(--sky) 0deg,var(--purple) 90deg,var(--sky) 180deg,transparent 240deg,var(--sky) 300deg,var(--purple) 360deg);}
+
+/* Green center */
+.center-panel{background:linear-gradient(180deg,#0d3d0d,#1a6e1a,#0d3d0d);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;border-left:1px solid rgba(255,107,0,.25);border-right:1px solid rgba(0,176,255,.25);position:relative;overflow:hidden;}
+.center-panel::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at center,rgba(0,255,0,.15),transparent 70%);pointer-events:none;}
+.ms-badge{font-family:'Orbitron',sans-serif;font-size:13px;font-weight:900;padding:4px 14px;border-radius:20px;letter-spacing:1.5px;animation:bpulse 2s infinite;position:relative;z-index:1;}
+@keyframes bpulse{50%{transform:scale(1.07);}}
+.ms-live{background:var(--red);box-shadow:0 0 18px rgba(232,0,29,.7);}
+.ms-break{background:#1565C0;} .ms-rain{background:var(--purple);}
+.cb-wrap{position:relative;z-index:1;}
+.current-ball{width:72px;height:72px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue';font-size:42px;border:3px solid rgba(255,255,255,.3);animation:cbPop .5s cubic-bezier(.34,1.56,.64,1);}
+@keyframes cbPop{from{transform:scale(0) rotate(-180deg);opacity:0;}}
+.cb-dot{background:rgba(255,255,255,.08);color:rgba(255,255,255,.3);border-color:rgba(255,255,255,.12);}
+.cb-1,.cb-2,.cb-3{background:linear-gradient(135deg,#1B5E20,#388E3C);color:#fff;border-color:#66BB6A;box-shadow:0 0 20px rgba(56,142,60,.6);}
+.cb-4{background:linear-gradient(135deg,#E65100,#FF6D00);color:#fff;border-color:var(--gold);box-shadow:0 0 26px rgba(255,109,0,.8);}
+.cb-6{background:linear-gradient(135deg,#B71C1C,#E53935);color:#fff;border-color:#FF1744;box-shadow:0 0 30px rgba(229,57,53,.9);}
+.cb-W{background:linear-gradient(135deg,#880E4F,#C2185B);color:#fff;border-color:#F48FB1;box-shadow:0 0 30px rgba(194,24,91,.9);}
+.cb-WD,.cb-NB{background:linear-gradient(135deg,#4527A0,#7B1FA2);color:#fff;border-color:#CE93D8;box-shadow:0 0 18px rgba(123,31,162,.7);}
+.center-time{font-size:9px;color:rgba(255,255,255,.4);font-family:'Orbitron';letter-spacing:1px;position:relative;z-index:1;}
+
+/* ═══ STATS ROW ══════════════════════════════════════════════════*/
+.stats-row{height:66px;background:linear-gradient(90deg,#060c1a,#0d1830,#060c1a);display:flex;align-items:center;justify-content:space-around;border-bottom:1px solid rgba(255,215,0,.15);flex-shrink:0;padding:0 6px;}
+.st{display:flex;align-items:center;gap:5px;}
+.sl{font-size:20px;font-weight:700;color:rgba(255,215,0,.85);letter-spacing:1px;font-family:'Teko',sans-serif;}
+.sv{font-family:'Bebas Neue';font-size:46px;color:var(--fc);line-height:1;}
+.sv.or{color:var(--orange);} .sv.gr{color:var(--green);} .sv.rd{color:#ff5555;}
+.sdiv{width:1px;height:48px;background:rgba(255,255,255,.1);}
+
+/* ═══ MIDDLE ══════════════════════════════════════════════════════*/
+.middle{flex:1;display:grid;grid-template-columns:260px 1fr 260px;overflow:hidden;min-height:0;}
+
+.lp,.rp{display:flex;flex-direction:column;padding:5px 6px;gap:4px;overflow:hidden;background:linear-gradient(180deg,#070e1c,#030810);}
+.lp{border-right:2px solid rgba(255,107,0,.2);}
+.rp{border-left:2px solid rgba(0,176,255,.2);}
+
+.pc{background:rgba(255,255,255,.025);border-radius:10px;padding:7px 6px 5px;border:1px solid rgba(255,255,255,.06);display:flex;flex-direction:column;align-items:center;position:relative;overflow:hidden;flex-shrink:0;}
+.pc::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;}
+.bat-card::before{background:linear-gradient(90deg,transparent,var(--orange),transparent);}
+.bowl-card::before{background:linear-gradient(90deg,transparent,var(--sky),transparent);}
+.lw-card::before{background:linear-gradient(90deg,transparent,var(--red),transparent);}
+.role-tag{font-family:'Orbitron',sans-serif;font-size:8px;font-weight:700;letter-spacing:2px;padding:2px 9px;border-radius:20px;margin-bottom:4px;}
+.rt-bat{background:linear-gradient(90deg,var(--orange),var(--gold));color:#000;}
+.rt-bowl{background:linear-gradient(90deg,var(--purple),var(--sky));color:#fff;}
+.rt-lw{background:linear-gradient(90deg,var(--red),#ff5555);color:#fff;}
+
+.p-rect{width:112px;height:70px;border-radius:8px;overflow:hidden;display:flex;align-items:center;justify-content:center;margin-bottom:4px;flex-shrink:0;background:#0a1428;position:relative;}
+.p-rect::before{content:'';position:absolute;inset:0;border-radius:8px;padding:2px;background:linear-gradient(90deg,var(--gold),var(--orange),var(--gold));-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask-composite:exclude;animation:rectBorder 3s linear infinite;}
+@keyframes rectBorder{0%{background:linear-gradient(0deg,var(--gold),var(--orange),var(--gold));}25%{background:linear-gradient(90deg,var(--gold),var(--orange),var(--gold));}50%{background:linear-gradient(180deg,var(--gold),var(--orange),var(--gold));}75%{background:linear-gradient(270deg,var(--gold),var(--orange),var(--gold));}100%{background:linear-gradient(360deg,var(--gold),var(--orange),var(--gold));}}
+.p-rect img{width:100%;height:100%;object-fit:cover;object-position:top center;border-radius:8px;}
+.bowl-rect::before{background:linear-gradient(90deg,var(--sky),var(--purple),var(--sky));animation:rectBorderB 3s linear infinite;}
+@keyframes rectBorderB{0%{background:linear-gradient(0deg,var(--sky),var(--purple),var(--sky));}50%{background:linear-gradient(180deg,var(--sky),var(--purple),var(--sky));}100%{background:linear-gradient(360deg,var(--sky),var(--purple),var(--sky));}}
+.p-rect-inner{position:absolute;inset:2px;border-radius:6px;overflow:hidden;display:flex;align-items:center;justify-content:center;background:#0a1428;}
+.p-rect-inner img{width:100%;height:100%;object-fit:cover;object-position:top center;}
+.p-rect-spin{position:absolute;inset:-2px;border-radius:8px;background:conic-gradient(from 0deg, var(--gold), var(--orange), transparent, var(--gold));animation:spinBorder 2s linear infinite;z-index:-1;}
+.bowl-spin{background:conic-gradient(from 0deg, var(--sky), var(--purple), transparent, var(--sky));}
+
+.p-nm{font-family:'Orbitron',sans-serif;font-size:11px;font-weight:700;text-align:center;color:var(--fc);text-transform:uppercase;line-height:1.1;margin-bottom:1px;}
+.p-sc{font-family:'Bebas Neue';font-size:28px;line-height:1;text-align:center;}
+.p-sc.upd{animation:pfl .5s ease;}
+@keyframes pfl{50%{transform:scale(1.1);}}
+.bat-sc{color:var(--gold);} .bowl-sc{color:#90CAF9;}
+.p-stats{display:flex;gap:6px;justify-content:center;background:rgba(0,0,0,.3);border-radius:5px;padding:3px 6px;width:100%;margin-top:2px;}
+.ps{display:flex;flex-direction:column;align-items:center;}
+.psl{font-size:9px;color:rgba(255,215,0,.8);font-weight:700;letter-spacing:1px;}
+.psv{font-size:22px;font-weight:700;font-family:'Bebas Neue';line-height:1;color:var(--fc);}
+
+.bat-zone{width:100%;height:48px;display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;}
+.bat-svg{animation:batSwing 1.4s ease-in-out infinite;transform-origin:74% 88%;}
+@keyframes batSwing{0%{transform:rotate(-62deg);}26%{transform:rotate(16deg);}52%{transform:rotate(-7deg);}100%{transform:rotate(-62deg);}}
+
+.ball-zone{width:100%;height:56px;position:relative;overflow:hidden;flex-shrink:0;}
+.roll-ball{position:absolute;top:50%;width:52px;height:52px;border-radius:50%;background:radial-gradient(circle at 30% 30%,#ff9999,#CC0000 45%,#7B0000);box-shadow:0 0 22px rgba(200,0,0,.8);transform:translateY(-50%);animation:rollA 2s linear infinite;border:2px solid rgba(255,150,150,.3);}
+.roll-ball::after{content:'';position:absolute;inset:4px;border-radius:50%;border-top:3px solid rgba(255,160,160,.7);border-right:2px solid transparent;border-bottom:3px solid rgba(255,160,160,.7);border-left:2px solid transparent;animation:seam 2s linear infinite;}
+@keyframes seam{to{transform:rotate(-720deg);}}
+@keyframes rollA{0%{left:108%;transform:translateY(-50%) rotate(0deg);}100%{left:-20%;transform:translateY(-50%) rotate(-1080deg);}}
+
+.cg{position:relative;overflow:hidden;background:#020810;}
+.over-bar{position:absolute;top:0;left:0;right:0;height:32px;background:linear-gradient(90deg,rgba(6,14,28,.97),rgba(10,20,40,.99),rgba(6,14,28,.97));border-bottom:2px solid rgba(255,107,0,.45);display:flex;align-items:center;padding:0 10px;gap:7px;z-index:20;}
+.ob-lbl{font-family:'Orbitron',sans-serif;font-size:10px;font-weight:900;color:var(--orange);letter-spacing:1px;flex-shrink:0;min-width:80px;}
+.ob-balls{display:flex;gap:4px;align-items:center;flex:1;}
+.ob-bch{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue';font-size:13px;border:2px solid rgba(255,255,255,.18);animation:bIn .4s cubic-bezier(.34,1.56,.64,1) both;}
+@keyframes bIn{from{transform:scale(0);opacity:0;}}
+.b-dot{background:rgba(255,255,255,.07);color:rgba(255,255,255,.3);}
+.b-1,.b-2,.b-3{background:linear-gradient(135deg,#1B5E20,#388E3C);color:#fff;border-color:#66BB6A;}
+.b-4{background:linear-gradient(135deg,#E65100,#FF6D00);color:#fff;border-color:var(--gold);}
+.b-6{background:linear-gradient(135deg,#B71C1C,#E53935);color:#fff;border-color:#FF1744;}
+.b-W{background:linear-gradient(135deg,#880E4F,#C2185B);color:#fff;border-color:#F48FB1;}
+.b-WD,.b-NB{background:linear-gradient(135deg,#4527A0,#7B1FA2);color:#fff;border-color:#CE93D8;}
+.ob-tot{font-family:'Bebas Neue';font-size:17px;color:var(--gold);flex-shrink:0;}
+
+.atm-beam{position:absolute;width:5px;background:linear-gradient(180deg,rgba(255,200,100,.1),transparent);transform-origin:bottom center;z-index:2;pointer-events:none;}
+.ab1{top:32px;height:170px;left:8%;transform:rotate(-22deg);}
+.ab2{top:32px;height:150px;left:26%;transform:rotate(-10deg);}
+.ab3{top:32px;height:150px;right:26%;transform:rotate(10deg);}
+.ab4{top:32px;height:170px;right:8%;transform:rotate(22deg);}
+
+.ground-wrap{position:absolute;inset:0;top:32px;display:flex;align-items:center;justify-content:center;z-index:3;}
+#bgCanvas{position:absolute;inset:0;z-index:1;pointer-events:none;}
+
+.ginfo{position:absolute;z-index:10;background:rgba(0,0,0,.75);border:1px solid rgba(255,107,0,.4);border-radius:6px;padding:3px 8px;font-family:'Teko',sans-serif;font-size:15px;color:var(--gold);white-space:nowrap;backdrop-filter:blur(4px);}
+.gi-tl{top:36px;left:4px;}
+.gi-tr{top:36px;right:4px;}
+.gi-bl{bottom:2px;left:4px;}
+.gi-br{bottom:2px;right:4px;}
+
+/* ═══ LOWER BAR ══════════════════════════════════════════════════*/
+.lower{height:62px;flex-shrink:0;background:linear-gradient(180deg,#060b14,#040810);border-top:2px solid rgba(255,107,0,.35);display:flex;flex-direction:column;}
+.lw-row{height:24px;background:rgba(232,0,29,.08);display:flex;align-items:center;justify-content:space-between;padding:0 14px;border-bottom:1px solid rgba(232,0,29,.16);}
+.lw-lbl{font-size:11px;font-weight:700;color:var(--red);letter-spacing:1px;}
+.lw-val{font-size:11px;color:var(--fc);font-weight:700;}
+.lw-right{font-size:11px;color:var(--gold);font-weight:700;letter-spacing:1px;}
+.ov-row{flex:1;display:flex;align-items:center;padding:0 12px;gap:6px;overflow:hidden;}
+.ytb{font-size:11px;color:rgba(255,255,255,.5);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;}
+.ytb b{color:var(--orange);margin-right:3px;}
+
+.upill{position:fixed;top:6px;right:6px;background:var(--green);color:#000;font-family:'Orbitron',sans-serif;font-size:9px;font-weight:900;padding:4px 10px;border-radius:20px;display:none;z-index:999;}
+@keyframes pill{0%{opacity:0;transform:scale(.8);}10%{opacity:1;transform:scale(1);}90%{opacity:1;}100%{opacity:0;}}
+
+/* ═══ SETTINGS MODAL (Ctrl+S) ═══════════════════════════════════*/
+#settingsModal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:9999;backdrop-filter:blur(10px);align-items:center;justify-content:center;}
+#settingsModal.open{display:flex;}
+.sm-box{background:linear-gradient(135deg,#0a1628,#051020);border:2px solid var(--orange);border-radius:16px;padding:24px 28px;width:580px;max-height:90vh;overflow-y:auto;}
+.sm-title{font-family:'Orbitron',sans-serif;font-size:17px;color:var(--gold);letter-spacing:2px;margin-bottom:18px;text-align:center;}
+.sm-section{margin-bottom:16px;}
+.sm-lbl{font-size:13px;font-weight:700;color:rgba(255,215,0,.8);letter-spacing:1px;margin-bottom:8px;font-family:'Teko',sans-serif;font-size:16px;}
+.sm-row{display:flex;gap:12px;align-items:center;flex-wrap:wrap;}
+.sm-color{display:flex;align-items:center;gap:8px;}
+.sm-color label{font-size:12px;color:rgba(255,255,255,.7);}
+input[type=color]{width:44px;height:32px;border:none;border-radius:6px;cursor:pointer;background:none;}
+.sm-inp{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2);border-radius:6px;color:#fff;font-family:'Bebas Neue';font-size:22px;padding:6px 12px;width:120px;text-align:center;}
+.sm-btn{background:linear-gradient(90deg,var(--orange),var(--gold));color:#000;font-family:'Orbitron',sans-serif;font-size:11px;font-weight:900;padding:8px 18px;border:none;border-radius:8px;cursor:pointer;letter-spacing:1px;}
+.sm-btn.cancel{background:rgba(255,255,255,.1);color:#fff;}
+.sm-btn.danger{background:rgba(232,0,29,.3);color:#ff8888;border:1px solid rgba(232,0,29,.4);}
+.sm-divider{height:1px;background:rgba(255,255,255,.1);margin:12px 0;}
+.sm-manual{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.sm-field{display:flex;flex-direction:column;gap:4px;}
+.sm-field label{font-size:11px;color:rgba(255,215,0,.7);font-family:'Teko';}
+.sm-field input{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2);border-radius:6px;color:#fff;font-family:'Bebas Neue';font-size:18px;padding:5px 10px;width:100%;}
+
+/* Flag picker section */
+.flag-pick-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.flag-pick-card{background:rgba(255,255,255,.05);border:1px solid rgba(255,215,0,.2);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;align-items:center;gap:8px;}
+.fp-preview{width:64px;height:64px;border-radius:50%;overflow:hidden;border:3px solid var(--gold);display:flex;align-items:center;justify-content:center;background:#0a1428;font-size:28px;flex-shrink:0;}
+.fp-preview img{width:100%;height:100%;object-fit:cover;border-radius:50%;}
+.fp-team-name{font-family:'Orbitron',sans-serif;font-size:11px;color:var(--gold);letter-spacing:1px;}
+.fp-url-input{width:100%;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);border-radius:5px;color:#fff;font-size:12px;padding:4px 8px;}
+.fp-url-input::placeholder{color:rgba(255,255,255,.3);}
+.fp-or{font-size:11px;color:rgba(255,255,255,.3);}
+/* Hidden file input + styled button */
+.fp-file-btn{background:rgba(255,215,0,.12);color:var(--gold);border:1px dashed var(--gold);border-radius:6px;padding:5px 10px;font-size:11px;font-family:'Orbitron';cursor:pointer;text-align:center;width:100%;}
+.fp-file-input{display:none;}
+.fp-actions{display:flex;gap:6px;width:100%;}
+.sm-btn.sm-sm{padding:5px 10px;font-size:10px;}
+</style>
+</head>
+<body>
+<div class="upill" id="upill">LIVE UPDATE</div>
+
+<!-- SETTINGS MODAL -->
+<div id="settingsModal">
+  <div class="sm-box">
+    <div class="sm-title">⚙ OVERLAY SETTINGS</div>
+
+    <!-- FLAG PICKER -->
+    <div class="sm-section">
+      <div class="sm-lbl">🏴 TEAM FLAG IMAGES</div>
+      <div class="flag-pick-grid">
+        <!-- Team 1 Flag -->
+        <div class="flag-pick-card">
+          <div class="fp-team-name" id="fpName1" style="color:var(--orange)">TEAM 1</div>
+          <div class="fp-preview" id="fpPreview1">🏏</div>
+          <input class="fp-url-input" id="fpUrl1" placeholder="Paste flag image URL…" oninput="previewFlag(1)">
+          <div class="fp-or">— or upload —</div>
+          <label class="fp-file-btn" for="fpFile1">📁 Choose Image File</label>
+          <input class="fp-file-input" type="file" id="fpFile1" accept="image/*" onchange="loadFlagFile(1, this)">
+          <div class="fp-actions">
+            <button class="sm-btn sm-sm" onclick="applyFlag(1)" style="flex:1;">✓ SET FLAG</button>
+            <button class="sm-btn cancel sm-sm" onclick="clearFlag(1)" style="flex:1;">✕ CLEAR</button>
+          </div>
+        </div>
+        <!-- Team 2 Flag -->
+        <div class="flag-pick-card">
+          <div class="fp-team-name" id="fpName2" style="color:var(--sky)">TEAM 2</div>
+          <div class="fp-preview" id="fpPreview2">🏏</div>
+          <input class="fp-url-input" id="fpUrl2" placeholder="Paste flag image URL…" oninput="previewFlag(2)">
+          <div class="fp-or">— or upload —</div>
+          <label class="fp-file-btn" for="fpFile2">📁 Choose Image File</label>
+          <input class="fp-file-input" type="file" id="fpFile2" accept="image/*" onchange="loadFlagFile(2, this)">
+          <div class="fp-actions">
+            <button class="sm-btn sm-sm" onclick="applyFlag(2)" style="flex:1;">✓ SET FLAG</button>
+            <button class="sm-btn cancel sm-sm" onclick="clearFlag(2)" style="flex:1;">✕ CLEAR</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sm-divider"></div>
+
+    <!-- COLORS -->
+    <div class="sm-section">
+      <div class="sm-lbl">🎨 COLORS</div>
+      <div class="sm-row">
+        <div class="sm-color"><label>Font</label><input type="color" id="fcPicker" value="#ffffff" oninput="applyColors()"></div>
+        <div class="sm-color"><label>Panel BG</label><input type="color" id="bcPicker" value="#0a1628" oninput="applyColors()"></div>
+        <div class="sm-color"><label>Accent</label><input type="color" id="accentPicker" value="#FF6B00" oninput="applyColors()"></div>
+      </div>
+    </div>
+
+    <div class="sm-divider"></div>
+
+    <!-- MANUAL SCORE OVERRIDE -->
+    <div class="sm-section">
+      <div class="sm-lbl">✏ MANUAL SCORE OVERRIDE <small style="color:rgba(255,255,255,.4);font-size:10px">(if scraper fails)</small></div>
+      <div class="sm-manual">
+        <div class="sm-field"><label>Team 1 Name</label><input id="mt1name" placeholder="AUS-W"></div>
+        <div class="sm-field"><label>Team 2 Name</label><input id="mt2name" placeholder="IND-W"></div>
+        <div class="sm-field"><label>Team 1 Score (e.g. 136-2)</label><input id="mt1score" placeholder="136-2"></div>
+        <div class="sm-field"><label>Team 2 Score</label><input id="mt2score" placeholder="0-0"></div>
+        <div class="sm-field"><label>Team 1 Overs</label><input id="mt1ov" placeholder="22.1"></div>
+        <div class="sm-field"><label>Team 2 Overs</label><input id="mt2ov" placeholder="0.0"></div>
+        <div class="sm-field"><label>CRR</label><input id="mcrr" placeholder="6.38"></div>
+        <div class="sm-field"><label>Status</label><input id="mstatus" placeholder="LIVE"></div>
+      </div>
+      <div style="margin-top:10px;display:flex;gap:10px;">
+        <button class="sm-btn" onclick="applyManual()">APPLY MANUAL</button>
+        <button class="sm-btn cancel" onclick="clearManual()">CLEAR MANUAL</button>
+      </div>
+    </div>
+
+    <div class="sm-divider"></div>
+    <div style="display:flex;justify-content:flex-end;gap:10px;">
+      <button class="sm-btn cancel" onclick="closeSettings()">CLOSE (ESC)</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay">
+
+<!-- TOP BAR -->
+<div class="top-bar">
+  <!-- LEFT: SCORE | FLAG | TEAMNAME -->
+  <div class="team-panel left">
+    <div class="t-score-big" id="tscore1">---</div>
+    <div class="flag-ring"><div class="flag-inner" id="flag1">🏏</div></div>
+    <div class="t-info-col">
+      <div class="t-name" id="tname1">TEAM 1</div>
+      <div class="t-overs" id="tovers1">0.0 OV</div>
+    </div>
+  </div>
+
+  <div class="center-panel">
+    <div class="ms-badge ms-live" id="sbadge">LIVE</div>
+    <div class="cb-wrap">
+      <div class="current-ball cb-dot" id="currentBall">·</div>
+    </div>
+    <div class="center-time" id="lastUpdated">--:--:--</div>
+  </div>
+
+  <!-- RIGHT: TEAMNAME | FLAG | SCORE -->
+  <div class="team-panel right">
+    <div class="t-score-big" id="tscore2">—</div>
+    <div class="flag-ring right"><div class="flag-inner" id="flag2">🏏</div></div>
+    <div class="t-info-col right">
+      <div class="t-name" id="tname2">TEAM 2</div>
+      <div class="t-overs" id="tovers2">0.0 OV</div>
+    </div>
+  </div>
+</div>
+
+<!-- STATS ROW -->
+<div class="stats-row">
+  <div class="st"><span class="sl">CRR</span><span class="sv or" id="sCRR">0.00</span></div>
+  <div class="sdiv"></div>
+  <div class="st"><span class="sl">RRR</span><span class="sv" id="sRRR">---</span></div>
+  <div class="sdiv"></div>
+  <div class="st"><span class="sl">PSHIP</span><span class="sv or" id="sPship">0(0)</span></div>
+  <div class="sdiv"></div>
+  <div class="st"><span class="sl">TARGET</span><span class="sv gr" id="sTarget">---</span></div>
+  <div class="sdiv"></div>
+  <div class="st"><span class="sl">NEED</span><span class="sv rd" id="sNeed">---</span></div>
+  <div class="sdiv"></div>
+  <div class="st"><span class="sl">STATUS</span><span class="sv" id="sStat">LIVE</span></div>
+</div>
+
+<!-- MIDDLE -->
+<div class="middle">
+
+  <!-- LEFT: BATSMEN -->
+  <div class="lp">
+    <div class="bat-zone">
+      <svg width="90" height="48" viewBox="0 0 100 54" class="bat-svg">
+        <rect x="44" y="6" width="12" height="38" rx="4" fill="#D4A96A"/>
+        <rect x="42" y="42" width="16" height="9" rx="3" fill="#FFECB3"/>
+        <rect x="42" y="4" width="16" height="5" rx="2" fill="#BCAAA4"/>
+        <rect x="47" y="0" width="6" height="7" rx="2" fill="#795548"/>
+      </svg>
+    </div>
+    <!-- Batsman 1 -->
+    <div class="pc bat-card">
+      <div class="role-tag rt-bat">BATMAN</div>
+      <div class="p-rect" id="bat1Rect">
+        <div class="p-rect-spin"></div>
+        <div class="p-rect-inner">
+          <svg width="112" height="70" viewBox="0 0 112 70" id="bat1Svg">
+            <rect width="112" height="70" fill="#0a1428"/>
+            <ellipse cx="56" cy="80" rx="36" ry="18" fill="#E65100"/>
+            <path d="M20 58 Q56 50 92 58 L92 78 Q56 84 20 78Z" fill="#FF6D00"/>
+            <ellipse cx="56" cy="36" rx="16" ry="18" fill="#FFCCBC"/>
+            <ellipse cx="56" cy="22" rx="16" ry="7" fill="#212121"/>
+            <circle cx="49" cy="34" r="2.5" fill="#fff"/><circle cx="63" cy="34" r="2.5" fill="#fff"/>
+            <circle cx="49.5" cy="34.5" r="1.5" fill="#212121"/><circle cx="63.5" cy="34.5" r="1.5" fill="#212121"/>
+            <path d="M50 44 L62 44" stroke="#BF8A6E" stroke-width="2" fill="none"/>
+            <path d="M38 30 Q38 15 56 13 Q74 15 74 30" fill="#F57F17"/>
+          </svg>
+        </div>
+      </div>
+      <div class="p-nm" id="bat1Name">BATSMAN 1</div>
+      <div class="p-sc bat-sc" id="bat1Score">0(0)</div>
+      <div class="p-stats">
+        <div class="ps"><div class="psl">4S</div><div class="psv" id="bat1Fours">0</div></div>
+        <div class="ps"><div class="psl">6S</div><div class="psv" id="bat1Sixes">0</div></div>
+        <div class="ps"><div class="psl">SR</div><div class="psv" id="bat1SR">0.00</div></div>
+      </div>
+    </div>
+    <!-- Batsman 2 -->
+    <div class="pc bat-card">
+      <div class="role-tag rt-bat">BATMAN</div>
+      <div class="p-rect" id="bat2Rect">
+        <div class="p-rect-spin"></div>
+        <div class="p-rect-inner">
+          <svg width="112" height="70" viewBox="0 0 112 70" id="bat2Svg">
+            <rect width="112" height="70" fill="#0a1428"/>
+            <ellipse cx="56" cy="80" rx="36" ry="18" fill="#1B5E20"/>
+            <path d="M20 58 Q56 50 92 58 L92 78 Q56 84 20 78Z" fill="#388E3C"/>
+            <ellipse cx="56" cy="36" rx="16" ry="18" fill="#D4A574"/>
+            <ellipse cx="56" cy="22" rx="16" ry="7" fill="#212121"/>
+            <circle cx="49" cy="34" r="2.5" fill="#fff"/><circle cx="63" cy="34" r="2.5" fill="#fff"/>
+            <circle cx="49.5" cy="34.5" r="1.5" fill="#212121"/><circle cx="63.5" cy="34.5" r="1.5" fill="#212121"/>
+            <path d="M50 44 L62 44" stroke="#BF8A6E" stroke-width="2" fill="none"/>
+            <path d="M38 30 Q38 15 56 13 Q74 15 74 30" fill="#2E7D32"/>
+          </svg>
+        </div>
+      </div>
+      <div class="p-nm" id="bat2Name">BATSMAN 2</div>
+      <div class="p-sc bat-sc" id="bat2Score">0(0)</div>
+      <div class="p-stats">
+        <div class="ps"><div class="psl">4S</div><div class="psv" id="bat2Fours">0</div></div>
+        <div class="ps"><div class="psl">6S</div><div class="psv" id="bat2Sixes">0</div></div>
+        <div class="ps"><div class="psl">SR</div><div class="psv" id="bat2SR">0.00</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CENTER GROUND -->
+  <div class="cg">
+    <canvas id="bgCanvas"></canvas>
+    <div class="over-bar">
+      <div class="ob-lbl" id="overLbl">OVER 1:</div>
+      <div class="ob-balls" id="overBalls"></div>
+      <div class="ob-tot">= <span id="overTot">0</span></div>
+    </div>
+    <div class="atm-beam ab1"></div><div class="atm-beam ab2"></div>
+    <div class="atm-beam ab3"></div><div class="atm-beam ab4"></div>
+    <div class="ginfo gi-tl" id="gi_pship">PSHIP: ---</div>
+    <div class="ginfo gi-tr" id="gi_lw">LW: ---</div>
+    <div class="ginfo gi-bl" id="gi_ytb">YTB: ---</div>
+    <div class="ginfo gi-br" id="gi_fmt">T20</div>
+    <div class="ground-wrap">
+      <svg viewBox="0 0 716 490" width="100%" height="100%">
+        <defs>
+          <radialGradient id="outG" cx="50%" cy="44%" r="55%">
+            <stop offset="0%" stop-color="#2E7D32"/>
+            <stop offset="60%" stop-color="#1B5E20"/>
+            <stop offset="100%" stop-color="#0a1a0a"/>
+          </radialGradient>
+          <linearGradient id="pitchG" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#C8A96E"/>
+            <stop offset="100%" stop-color="#9C7A3C"/>
+          </linearGradient>
+          <filter id="psh"><feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="rgba(0,0,0,.7)"/></filter>
+        </defs>
+        <rect width="716" height="490" fill="transparent"/>
+        <ellipse cx="358" cy="336" rx="298" ry="192" fill="url(#outG)"/>
+        <ellipse cx="358" cy="326" rx="172" ry="112" fill="none" stroke="rgba(255,255,255,.28)" stroke-width="1.8" stroke-dasharray="7,5"/>
+        <ellipse cx="358" cy="336" rx="294" ry="187" fill="none" stroke="rgba(255,255,255,.58)" stroke-width="2.5"/>
+        <rect x="334" y="230" width="48" height="158" rx="4" fill="url(#pitchG)"/>
+        <rect x="322" y="370" width="72" height="3" rx="1" fill="white" opacity=".9"/>
+        <rect x="322" y="234" width="72" height="3" rx="1" fill="white" opacity=".9"/>
+        <rect x="346" y="360" width="4" height="24" rx="1.5" fill="#F5F5DC" opacity=".9"/>
+        <rect x="353" y="360" width="4" height="24" rx="1.5" fill="#F5F5DC" opacity=".9"/>
+        <rect x="360" y="360" width="4" height="24" rx="1.5" fill="#F5F5DC" opacity=".9"/>
+        <rect x="346" y="218" width="4" height="18" rx="1.5" fill="#F5F5DC" opacity=".8"/>
+        <rect x="352" y="218" width="4" height="18" rx="1.5" fill="#F5F5DC" opacity=".8"/>
+        <rect x="358" y="218" width="4" height="18" rx="1.5" fill="#F5F5DC" opacity=".8"/>
+        <g filter="url(#psh)">
+          <ellipse cx="164" cy="310" rx="10" ry="12" fill="#1565C0"/><circle cx="164" cy="294" r="6.5" fill="#D4A574"/>
+          <ellipse cx="200" cy="242" rx="10" ry="12" fill="#1565C0"/><circle cx="200" cy="226" r="6.5" fill="#FFCCBC"/>
+          <ellipse cx="292" cy="218" rx="10" ry="12" fill="#1565C0"/><circle cx="292" cy="202" r="6.5" fill="#D4A574"/>
+          <ellipse cx="424" cy="218" rx="10" ry="12" fill="#1565C0"/><circle cx="424" cy="202" r="6.5" fill="#FFCCBC"/>
+          <ellipse cx="420" cy="340" rx="10" ry="12" fill="#1565C0"/><circle cx="420" cy="324" r="6.5" fill="#D4A574"/>
+          <ellipse cx="450" cy="320" rx="10" ry="12" fill="#1565C0"/><circle cx="450" cy="304" r="6.5" fill="#FFCCBC"/>
+          <ellipse cx="298" cy="422" rx="10" ry="12" fill="#1565C0"/><circle cx="298" cy="406" r="6.5" fill="#D4A574"/>
+          <ellipse cx="260" cy="456" rx="10" ry="12" fill="#1565C0"/><circle cx="260" cy="440" r="6.5" fill="#FFCCBC"/>
+          <ellipse cx="160" cy="408" rx="10" ry="12" fill="#1565C0"/><circle cx="160" cy="392" r="6.5" fill="#D4A574"/>
+        </g>
+        <g filter="url(#psh)"><ellipse cx="358" cy="393" rx="12" ry="14" fill="#7B1FA2"/><circle cx="358" cy="375" r="8" fill="#FFCCBC"/></g>
+        <g filter="url(#psh)" style="animation:bowlerRun 1.2s ease-in-out infinite alternate;transform-origin:358px 255px;">
+          <ellipse cx="358" cy="262" rx="11" ry="13" fill="#C62828"/><circle cx="358" cy="245" r="7.5" fill="#D4A574"/>
+          <line x1="358" y1="257" x2="376" y2="234" stroke="#D4A574" stroke-width="5" stroke-linecap="round"/>
+          <circle cx="378" cy="231" r="6" fill="#CC0000"/>
+        </g>
+        <style>@keyframes bowlerRun{0%{transform:translateY(0) rotate(-5deg);}100%{transform:translateY(-7px) rotate(6deg);}}</style>
+        <g filter="url(#psh)"><ellipse cx="350" cy="362" rx="12" ry="14" fill="#1A237E"/><circle cx="350" cy="344" r="8" fill="#D4A574"/><line x1="350" y1="358" x2="332" y2="376" stroke="#C49B5A" stroke-width="4" stroke-linecap="round"/></g>
+      </svg>
+    </div>
+  </div>
+
+  <!-- RIGHT: BOWLER + LAST WICKET -->
+  <div class="rp">
+    <div class="ball-zone"><div class="roll-ball"></div></div>
+    <!-- Bowler -->
+    <div class="pc bowl-card">
+      <div class="role-tag rt-bowl">BOWLER</div>
+      <div class="p-rect" id="bowlRect">
+        <div class="p-rect-spin bowl-spin"></div>
+        <div class="p-rect-inner">
+          <svg width="112" height="70" viewBox="0 0 112 70" id="bowlSvg">
+            <rect width="112" height="70" fill="#0a1428"/>
+            <ellipse cx="56" cy="80" rx="36" ry="18" fill="#4A148C"/>
+            <path d="M20 58 Q56 50 92 58 L92 78 Q56 84 20 78Z" fill="#6A1B9A"/>
+            <ellipse cx="56" cy="36" rx="16" ry="18" fill="#FFCCBC"/>
+            <ellipse cx="56" cy="22" rx="16" ry="7" fill="#212121"/>
+            <circle cx="49" cy="34" r="2.5" fill="#fff"/><circle cx="63" cy="34" r="2.5" fill="#fff"/>
+            <circle cx="49.5" cy="34.5" r="1.5" fill="#212121"/><circle cx="63.5" cy="34.5" r="1.5" fill="#212121"/>
+            <path d="M50 44 L62 44" stroke="#BF8A6E" stroke-width="2" fill="none"/>
+            <path d="M38 30 Q38 15 56 13 Q74 15 74 30" fill="#7B1FA2"/>
+          </svg>
+        </div>
+      </div>
+      <div class="p-nm" id="bowlName">BOWLER</div>
+      <div class="p-sc bowl-sc" id="bowlFigs">0-0(0)</div>
+      <div class="p-stats">
+        <div class="ps"><div class="psl">OV</div><div class="psv" id="bowlOv">0</div></div>
+        <div class="ps"><div class="psl">MN</div><div class="psv" id="bowlMd">0</div></div>
+        <div class="ps"><div class="psl">ECO</div><div class="psv" id="bowlEco">0.00</div></div>
+      </div>
+    </div>
+    <!-- Last wicket -->
+    <div class="pc lw-card" style="flex:1;min-height:60px;">
+      <div class="role-tag rt-lw">LAST WICKET</div>
+      <div style="padding:6px 4px;text-align:center;">
+        <div style="font-size:13px;color:#ff8888;font-weight:700;font-family:'Orbitron',sans-serif;text-transform:uppercase;line-height:1.4;word-break:break-word;" id="lastWktCard">---</div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /middle -->
+
+<!-- LOWER BAR -->
+<div class="lower">
+  <div class="lw-row">
+    <span><span class="lw-lbl">LAST-W: </span><span class="lw-val" id="lastWkt">---</span></span>
+    <span class="lw-right" id="yetBatRight">YET TO BAT: ---</span>
+  </div>
+  <div class="ov-row">
+    <div class="ytb" id="ytbText"><b>YET TO BAT:</b> ---</div>
+  </div>
+</div>
+
+</div><!-- /overlay -->
+
+<script>
+// ═══ ANIMATED 3D RED BACKGROUND CANVAS ════════════════════════════
+(function() {
+  const canvas = document.getElementById('bgCanvas');
+  const ctx = canvas.getContext('2d');
+  let W, H;
+  function resize() {
+    const cg = canvas.parentElement;
+    W = canvas.width  = cg.offsetWidth;
+    H = canvas.height = cg.offsetHeight;
+  }
+  resize();
+  const PARTICLES = 60;
+  const particles = Array.from({length: PARTICLES}, () => ({
+    x: Math.random() * W, y: Math.random() * H,
+    r: 1 + Math.random() * 3,
+    vx: (Math.random()-.5) * .4, vy: (Math.random()-.5) * .4,
+    alpha: .3 + Math.random() * .5,
+    pulse: Math.random() * Math.PI * 2
+  }));
+  const rings = Array.from({length: 4}, (_, i) => ({
+    phase: (i / 4) * Math.PI * 2,
+    speed: .008 + i * .003
+  }));
+  let t = 0;
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    const cx = W/2, cy = H * .56;
+    const bg = ctx.createRadialGradient(cx, cy, 10, cx, cy, Math.max(W,H)*.7);
+    bg.addColorStop(0, `rgba(${90+20*Math.sin(t*.03)},10,10,0)`);
+    bg.addColorStop(.35, `rgba(80,8,8,0)`);
+    bg.addColorStop(.42, `rgba(140,20,${10+10*Math.sin(t*.04)},0.55)`);
+    bg.addColorStop(.65, `rgba(${160+20*Math.sin(t*.02)},30,${15+8*Math.cos(t*.025)},0.85)`);
+    bg.addColorStop(1, `rgba(60,5,5,0.95)`);
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, W, H);
+    rings.forEach((ring, i) => {
+      ring.phase += ring.speed;
+      ctx.save();
+      ctx.globalAlpha = .12 + .08*Math.sin(ring.phase);
+      ctx.strokeStyle = `hsl(${0 + i*15},90%,${55+i*5}%)`;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, 200 + i*12, 130 + i*8, 0, 0, Math.PI*2);
+      ctx.stroke();
+      ctx.restore();
+    });
+    particles.forEach(p => {
+      p.pulse += .05; p.x += p.vx; p.y += p.vy;
+      if (p.x < 0) p.x = W; if (p.x > W) p.x = 0;
+      if (p.y < 0) p.y = H; if (p.y > H) p.y = 0;
+      const dx = (p.x - cx) / 250, dy = (p.y - cy) / 165;
+      if (dx*dx + dy*dy < 1) return;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r * (1 + .3*Math.sin(p.pulse)), 0, Math.PI*2);
+      ctx.fillStyle = `rgba(255,${80+40*Math.sin(p.pulse)},60,${p.alpha})`;
+      ctx.fill();
+    });
+    t++;
+    requestAnimationFrame(draw);
+  }
+  draw();
+})();
+
+// ═══ OVERLAY LOGIC ════════════════════════════════════════════════
+let prevJ = '', prevBall = '';
+let manualOverride = null;
+// Store manually set flags (as object URLs for local files or URLs)
+let manualFlags = { flag1: '', flag2: '' };
+
+function getBCls(b) {
+  const s = String(b||'').trim().toUpperCase();
+  if (!s||s==='0'||s==='.') return 'b-dot';
+  if (s==='W') return 'b-W'; if (s==='4') return 'b-4'; if (s==='6') return 'b-6';
+  if (s==='WD') return 'b-WD'; if (s==='NB') return 'b-NB';
+  const n=parseInt(s); if(n>=1&&n<=3) return 'b-'+n;
+  return 'b-dot';
+}
+function getCBCls(b){ return getBCls(b).replace('b-','cb-'); }
+function getBDisp(b){ const s=String(b||'').trim().toUpperCase(); return(!s||s==='0'||s==='.')?'·':s; }
+
+function setText(id, v, fl) {
+  const el=document.getElementById(id); if(!el) return;
+  const sv=String(v===undefined||v===null?'':v);
+  if(el.textContent!==sv){el.textContent=sv;if(fl){el.classList.remove('upd');void el.offsetWidth;el.classList.add('upd');}}
+}
+
+function setFlag(id, imgUrl, fb) {
+  const el=document.getElementById(id); if(!el) return;
+  // Check for manual override first
+  const manKey = id; // 'flag1' or 'flag2'
+  const manual = manualFlags[manKey];
+  const urlToUse = manual || imgUrl;
+  const validUrl = urlToUse && (urlToUse.startsWith('http') || urlToUse.startsWith('blob:') || urlToUse.startsWith('data:') || urlToUse.startsWith('//'));
+  if(validUrl){
+    const existing=el.querySelector('img');
+    if(existing && existing.src === urlToUse) return;
+    el.innerHTML=`<img src="${urlToUse}" crossorigin="anonymous" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;" onerror="this.parentNode.innerHTML='${fb||'🏏'}'">`;
+  } else { el.innerHTML=(fb||'🏏'); }
+}
+
+function setRectPhoto(rectId, svgId, url) {
+  const rect=document.getElementById(rectId); if(!rect) return;
+  const inner=rect.querySelector('.p-rect-inner'); if(!inner) return;
+  const svg=document.getElementById(svgId);
+  const validUrl = url && (url.startsWith('http')||url.startsWith('blob:')||url.startsWith('data:'));
+  const existing = inner.querySelector('img');
+  // Only update if URL actually changed
+  if(existing && existing.dataset.src === (url||'')) return;
+  if(existing) existing.remove();
+  if(validUrl) {
+    const img=document.createElement('img');
+    img.src=url;
+    img.dataset.src=url;
+    img.style.cssText='width:100%;height:100%;object-fit:cover;object-position:top center;border-radius:6px;';
+    img.onerror=function(){this.remove();if(svg)svg.style.display='';};
+    if(svg) svg.style.display='none';
+    inner.appendChild(img);
+  } else {
+    if(svg) svg.style.display='';
+  }
+}
+
+function renderOverBalls(balls, containerId) {
+  const c=document.getElementById(containerId); if(!c) return;
+  c.innerHTML='';
+  (balls||[]).forEach((b,i)=>{
+    const d=document.createElement('div');
+    d.className='ob-bch '+getBCls(b);
+    d.textContent=getBDisp(b);
+    d.style.animationDelay=(i*.06)+'s';
+    c.appendChild(d);
+  });
+}
+
+function updateCurrentBall(ball) {
+  if(ball===prevBall) return; prevBall=ball;
+  const old=document.getElementById('currentBall'); if(!old) return;
+  const el=old.cloneNode(false);
+  el.id='currentBall'; el.className='current-ball '+getCBCls(ball);
+  el.textContent=getBDisp(ball);
+  old.parentNode.replaceChild(el,old);
+}
+
+function showPill() {
+  const p=document.getElementById('upill');
+  p.style.display='block'; p.style.animation='none'; void p.offsetWidth;
+  p.style.animation='pill 2.5s ease forwards';
+  setTimeout(()=>{p.style.display='none';},2600);
+}
+
+async function poll() {
+  try {
+    const resp = await fetch('data.json?t='+Date.now());
+    if(!resp.ok) throw new Error('HTTP '+resp.status);
+    let d = await resp.json();
+    if(manualOverride) d = {...d, ...manualOverride};
+    const j=JSON.stringify(d);
+    if(j!==prevJ){showPill();prevJ=j;}
+
+    const t1=d.team1||{}, t2=d.team2||{};
+
+    // Update flag picker previews with current team names
+    const fp1name = document.getElementById('fpName1');
+    const fp2name = document.getElementById('fpName2');
+    if(fp1name) fp1name.textContent = (t1.name||'TEAM 1').toUpperCase();
+    if(fp2name) fp2name.textContent = (t2.name||'TEAM 2').toUpperCase();
+
+    // Flags — use manual override if set, else scraped
+    setFlag('flag1', t1.flag_img||'', '🏏');
+    setFlag('flag2', t2.flag_img||'', '🏏');
+
+    // Update settings previews
+    updateSettingsFlagPreviews(t1.flag_img, t2.flag_img);
+
+    setText('tname1', t1.name||'TEAM 1'); setText('tname2', t2.name||'TEAM 2');
+    setText('tscore1', t1.score||'---', true);
+    setText('tscore2', t2.score||'---', true);
+    const ov1 = t1.overs && /^\d{1,2}(\.\d)?$/.test(String(t1.overs)) ? t1.overs+' OV' : '';
+    const ov2 = t2.overs && /^\d{1,2}(\.\d)?$/.test(String(t2.overs)) ? t2.overs+' OV' : '';
+    setText('tovers1', ov1);
+    setText('tovers2', ov2);
+
+    const sb=document.getElementById('sbadge');
+    // Clean up status — strip anything that looks like a series/commentary description
+    let st=d.match_status||'LIVE';
+    // Remove anything after '|' or after long descriptive phrases
+    st = st.replace(/\|.*/,'').replace(/,?\s*(ICC|T20 World|Cricket|Series|Today|Cricbuzz|ball by ball|commentary|updates)[^$]*/i,'').trim();
+    if(!st || st.length < 2) st = 'LIVE';
+    if(sb){sb.textContent=st;sb.className='ms-badge '+(st.toLowerCase().includes('break')||st.toLowerCase().includes('inning')?'ms-break':st.toLowerCase().includes('rain')?'ms-rain':'ms-live');}
+    // STATUS field: short clean status only
+    const stShort = st.length > 22 ? st.substring(0,22)+'…' : st;
+    setText('lastUpdated',d.last_updated||'');
+
+    const balls=d.last_over_balls||[];
+    updateCurrentBall(d.current_ball||(balls.length?balls[balls.length-1]:''));
+
+    setText('sCRR',  d.crr||'---'); setText('sRRR',  d.rrr||'---');
+    setText('sPship',d.partnership||'0(0)'); setText('sTarget',d.target||'---');
+    setText('sNeed', d.need||'---'); setText('sStat', stShort);
+
+    const ovNum=d.current_over||0;
+    setText('overLbl','OVER '+(ovNum||1)+':');
+    renderOverBalls(balls,'overBalls');
+    const tot=(balls||[]).reduce((a,b)=>{const n=parseInt(b);return a+(isNaN(n)?0:n);},0);
+    setText('overTot',tot);
+
+    // Batsman 1
+    const b1=d.batsman1||{};
+    setRectPhoto('bat1Rect','bat1Svg',b1.photo||'');
+    setText('bat1Name',b1.name||'BATSMAN 1');
+    setText('bat1Score',b1.runs!==undefined?b1.runs+'('+b1.balls+')':'0(0)',true);
+    setText('bat1Fours',b1.fours!==undefined?b1.fours:0);
+    setText('bat1Sixes',b1.sixes!==undefined?b1.sixes:0);
+    setText('bat1SR',b1.sr||'0.00');
+
+    // Batsman 2
+    const b2=d.batsman2||{};
+    setRectPhoto('bat2Rect','bat2Svg',b2.photo||'');
+    setText('bat2Name',b2.name||'BATSMAN 2');
+    setText('bat2Score',b2.runs!==undefined?b2.runs+'('+b2.balls+')':'0(0)',true);
+    setText('bat2Fours',b2.fours!==undefined?b2.fours:0);
+    setText('bat2Sixes',b2.sixes!==undefined?b2.sixes:0);
+    setText('bat2SR',b2.sr||'0.00');
+
+    // Bowler — robust display
+    const bw=d.bowler||{};
+    setRectPhoto('bowlRect','bowlSvg',bw.photo||'');
+    setText('bowlName', bw.name || 'BOWLER');
+    // figures: W-R(O)
+    const bwFigs = bw.wickets!==undefined
+      ? `${bw.wickets}-${bw.runs}(${bw.overs})`
+      : '0-0(0)';
+    setText('bowlFigs', bwFigs, true);
+    setText('bowlOv',  bw.overs   !== undefined ? bw.overs   : '0');
+    setText('bowlMd',  bw.maidens !== undefined ? bw.maidens : '0');
+    setText('bowlEco', bw.economy !== undefined ? bw.economy : '0.00');
+
+    // Last wicket / YTB
+    const lw=d.last_wicket||'---';
+    setText('lastWktCard',lw); setText('lastWkt',lw);
+    const ytb=d.yet_to_bat||'---';
+    const ytbEl=document.getElementById('ytbText');
+    if(ytbEl) ytbEl.innerHTML='<b>YET TO BAT:</b> '+ytb;
+    const ytbR=document.getElementById('yetBatRight');
+    if(ytbR) ytbR.textContent='YTB: '+ytb.split(' ').slice(0,3).join(' ');
+
+    setText('gi_pship','PSHIP: '+(d.partnership||'---'));
+    setText('gi_lw','LW: '+(lw.length>20?lw.substring(0,18)+'…':lw));
+    setText('gi_ytb','YTB: '+ytb.split(' ').slice(0,2).join(' '));
+    setText('gi_fmt',(d.match_format||'T20')+' • '+(d.venue?.name||'').split(' ').slice(0,2).join(' '));
+
+  } catch(e){ console.error(e); }
+}
+poll();
+setInterval(poll,2000);
+
+setInterval(()=>{
+  const el=document.getElementById('lastUpdated');
+  if(el){ el.style.color='rgba(0,230,118,0.9)'; setTimeout(()=>{el.style.color='';},400); }
+},2000);
+
+// ═══ SETTINGS PANEL ═══════════════════════════════════════════════
+function applyColors() {
+  const fc=document.getElementById('fcPicker').value;
+  const bc=document.getElementById('bcPicker').value;
+  const ac=document.getElementById('accentPicker').value;
+  document.documentElement.style.setProperty('--fc',fc);
+  document.documentElement.style.setProperty('--bc',bc);
+  document.documentElement.style.setProperty('--orange',ac);
+}
+
+function openSettings() {
+  document.getElementById('settingsModal').classList.add('open');
+}
+function closeSettings() {
+  document.getElementById('settingsModal').classList.remove('open');
+}
+
+function applyManual() {
+  const t1n=document.getElementById('mt1name').value.trim();
+  const t2n=document.getElementById('mt2name').value.trim();
+  const t1s=document.getElementById('mt1score').value.trim();
+  const t2s=document.getElementById('mt2score').value.trim();
+  const t1o=document.getElementById('mt1ov').value.trim();
+  const t2o=document.getElementById('mt2ov').value.trim();
+  const crr=document.getElementById('mcrr').value.trim();
+  const st=document.getElementById('mstatus').value.trim();
+  manualOverride = {};
+  if(t1n||t1s||t1o) manualOverride.team1 = {name:t1n||'',score:t1s||'',overs:t1o||'',flag_img:''};
+  if(t2n||t2s||t2o) manualOverride.team2 = {name:t2n||'',score:t2s||'',overs:t2o||'',flag_img:''};
+  if(crr) manualOverride.crr = crr;
+  if(st)  manualOverride.match_status = st;
+  closeSettings();
+  poll();
+}
+function clearManual() {
+  manualOverride = null;
+  ['mt1name','mt2name','mt1score','mt2score','mt1ov','mt2ov','mcrr','mstatus'].forEach(id=>{
+    document.getElementById(id).value='';
+  });
+  poll();
+}
+
+// ═══ FLAG PICKER FUNCTIONS ═══════════════════════════════════════
+
+function updateSettingsFlagPreviews(url1, url2) {
+  // Only update preview if no manual flag set
+  if(!manualFlags.flag1 && url1) {
+    const p = document.getElementById('fpPreview1');
+    if(p && !p.querySelector('img')) {
+      p.innerHTML = `<img src="${url1}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" onerror="this.parentNode.textContent='🏏'">`;
+    }
+  }
+  if(!manualFlags.flag2 && url2) {
+    const p = document.getElementById('fpPreview2');
+    if(p && !p.querySelector('img')) {
+      p.innerHTML = `<img src="${url2}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" onerror="this.parentNode.textContent='🏏'">`;
+    }
+  }
+}
+
+function previewFlag(team) {
+  const url = document.getElementById('fpUrl'+team).value.trim();
+  const preview = document.getElementById('fpPreview'+team);
+  if(!preview) return;
+  if(url && (url.startsWith('http')||url.startsWith('//'))) {
+    preview.innerHTML = `<img src="${url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" onerror="this.parentNode.textContent='❌'">`;
+  }
+}
+
+function loadFlagFile(team, input) {
+  const file = input.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const dataUrl = e.target.result;
+    const preview = document.getElementById('fpPreview'+team);
+    if(preview) {
+      preview.innerHTML = `<img src="${dataUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+    }
+    // Pre-fill URL field as placeholder
+    const urlInput = document.getElementById('fpUrl'+team);
+    if(urlInput) urlInput.value = '[Local file loaded — click SET FLAG]';
+    // Store data URL for immediate use
+    window['_pendingFlagData'+team] = dataUrl;
+  };
+  reader.readAsDataURL(file);
+}
+
+function applyFlag(team) {
+  const urlInput = document.getElementById('fpUrl'+team);
+  const flagKey = 'flag'+team;
+  let finalUrl = '';
+
+  // Check for local file data URL first
+  const pending = window['_pendingFlagData'+team];
+  if(pending) {
+    finalUrl = pending;
+    window['_pendingFlagData'+team] = null;
+  } else {
+    const url = urlInput.value.trim();
+    if(url && url.startsWith('http')) {
+      finalUrl = url;
+    }
+  }
+
+  if(finalUrl) {
+    manualFlags[flagKey] = finalUrl;
+    // Force update the flag on overlay
+    const flagEl = document.getElementById(flagKey);
+    if(flagEl) {
+      flagEl.innerHTML = `<img src="${finalUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;" onerror="this.parentNode.textContent='🏏'">`;
+    }
+    // Update preview
+    const preview = document.getElementById('fpPreview'+team);
+    if(preview) {
+      preview.innerHTML = `<img src="${finalUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+    }
+
+    // Save to server data.json via fetch POST (or just store locally)
+    saveManualFlagToServer(team, finalUrl);
+    alert(`✓ Team ${team} flag set successfully!`);
+  } else {
+    alert('Please paste a URL or select an image file first.');
+  }
+}
+
+function clearFlag(team) {
+  const flagKey = 'flag'+team;
+  manualFlags[flagKey] = '';
+  window['_pendingFlagData'+team] = null;
+  const urlInput = document.getElementById('fpUrl'+team);
+  if(urlInput) urlInput.value = '';
+  const preview = document.getElementById('fpPreview'+team);
+  if(preview) preview.innerHTML = '🏏';
+  // Clear file input
+  const fileInput = document.getElementById('fpFile'+team);
+  if(fileInput) fileInput.value = '';
+  saveManualFlagToServer(team, '');
+  poll(); // refresh
+}
+
+async function saveManualFlagToServer(team, url) {
+  // Try to save manual flag to data.json via the scraper
+  // The scraper checks for flag_manual field on load
+  try {
+    const d = await (await fetch('data.json?t='+Date.now())).json();
+    if(team===1) d.team1.flag_manual = url;
+    if(team===2) d.team2.flag_manual = url;
+    // We can't POST to the simple HTTP server, so store in localStorage as backup
+    try { localStorage.setItem('manualFlag'+team, url); } catch(e){}
+  } catch(e){}
+  // Restore from localStorage on page load
+}
+
+// Restore manual flags from localStorage on load
+(function restoreManualFlags() {
+  for(let t of [1,2]) {
+    try {
+      const saved = localStorage.getItem('manualFlag'+t);
+      if(saved) {
+        manualFlags['flag'+t] = saved;
+        const flagEl = document.getElementById('flag'+t);
+        if(flagEl) {
+          flagEl.innerHTML = `<img src="${saved}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;">`;
+        }
+        const preview = document.getElementById('fpPreview'+t);
+        if(preview) {
+          preview.innerHTML = `<img src="${saved}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+        }
+      }
+    } catch(e){}
+  }
+})();
+
+document.addEventListener('keydown', e => {
+  if(e.ctrlKey && e.key.toLowerCase()==='s') { e.preventDefault(); openSettings(); }
+  if(e.key==='Escape') closeSettings();
+});
+</script>
+</body>
+</html>
